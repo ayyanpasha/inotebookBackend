@@ -11,7 +11,7 @@ const router = express.Router();
 // Validation middleware for signup
 const validateSignUpUserInput = [
     body('email').isEmail().withMessage("Invalid email address"),
-    body('password').trim().notEmpty().withMessage("Password cannot be blank"),
+    body('password').trim().isLength({ min: 5 }).withMessage("Password cannot be blank"),
     body('name').trim().isLength({ min: 3 }).withMessage("Name must be at least 3 characters long"),
 ];
 
@@ -26,7 +26,7 @@ router.post('/signup', validateSignUpUserInput, async (req, res) => {
         const { name, email, password } = req.body;
         let user = await User.findOne({ email });
         if (user) {
-            return res.status(400).json({ error: "User with this email already exists" });
+            return res.status(400).json({ errors: "User with this email already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -57,14 +57,14 @@ router.post('/login', validateLoginUserInput, async (req, res) => {
         const { email, password } = req.body;
         let user = await User.findOne({ email });
         if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(400).json({ error: "Invalid credentials" });
+            return res.status(400).json({ errors: "Invalid credentials" });
         }
 
         const authToken = jwt.sign({ user: { id: user.id } }, process.env.JWT_SECRET);
         res.status(200).json({ authToken });
     } catch (error) {
         // console.error(error.message);
-        res.status(500).send('Internal Server Error');
+        res.status(500).json({ errors: 'Internal Server Error' });
     }
 });
 // Login User: POST-'/api/auth/getuser'
@@ -74,11 +74,14 @@ router.post('/getuser',
         try {
             const userId = req.user.id;
 
-            let user = await User.findOne({ userId }).select("-password");
-            res.send(user);
+            let user = await User.findOne({ _id: userId }).select("-password");
+            if (!user) {
+                return res.status(400).json({ errors: "Invalid credentials" });
+            }
+            res.json(user);
         } catch (error) {
             // console.error(error.message);
-            res.status(500).send('Internal Server Error');
+            res.status(500).json({ errors: 'Internal Server Error' });
         }
     });
 

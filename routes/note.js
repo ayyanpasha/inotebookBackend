@@ -9,10 +9,10 @@ router.get('/',
     fetchUser,
     async (req, res) => {
         try {
-            const notes = await Note.find({ user: req.user.id });
+            const notes = await Note.find({ user: req.user.id }).select("-user");
             res.json(notes);
         } catch (error) {
-            return res.status(500).send('Internal Server Error');
+            return res.status(500).json({ errors: 'Internal Server Error' });
         }
     }
 );
@@ -27,25 +27,29 @@ router.post('/',
     fetchUser,
     validateUserInput,
     async (req, res) => {
+
         try {
             //Check for error in Validation
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return res.status(400).json({ error: errors.array() });
+                return res.status(401).json({ errors: errors.array() });
             }
             const { title, description, tag } = req.body;
             //Create New Note document
-            const note = new Note({
+            const newNote = {
                 title,
                 description,
-                tag,
                 user: req.user.id
-            });
+            };
+            if (tag && tag.length > 0) {
+                newNote.tag = tag
+            }
+            const note = new Note(newNote);
             //Save the document
             const savedNote = await note.save();
             res.json(savedNote);
         } catch (error) {
-            return res.status(500).send('Internal Server Error');
+            return res.status(500).json({ errors: 'Internal Server Error' });
         }
     }
 );
@@ -67,7 +71,7 @@ router.put('/:id',
                 description,
                 user: req.user.id
             };
-            if (tag && tag.length > 0) {
+            if (tag && tag.trim().length > 0) {
                 updatedNote.tag = tag
             }
 
@@ -82,7 +86,7 @@ router.put('/:id',
             }
             res.json({ note: await Note.findByIdAndUpdate(req.params.id, { $set: updatedNote }, { new: true }) });
         } catch (error) {
-            return res.status(500).send('Internal Server Error');
+            return res.status(500).json({ errors: 'Internal Server Error' });
         }
     }
 );
@@ -109,7 +113,7 @@ router.delete('/:id',
             note = await Note.findByIdAndDelete(req.params.id);
             res.json({ "Success": "Note has been deleted", note });
         } catch (error) {
-            return res.status(500).send('Internal Server Error');
+            return res.status(500).json({ errors: 'Internal Server Error' });
         }
     }
 );
